@@ -1,3 +1,5 @@
+use std::ffi::CStr;
+
 /// An error occurred when reading.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -199,6 +201,21 @@ impl<'a> Reader<'a> {
 		buf.copy_from_slice(self.slice(buf.len())?);
 		Ok(())
 	}
+
+	/// Reads data to and including the next null byte.
+	#[inline(always)]
+	pub fn cstr(&mut self) -> Result<&CStr> {
+		match CStr::from_bytes_until_nul(self.remaining()) {
+			Ok(cs) => {
+				self.pos += cs.to_bytes_with_nul().len();
+				Ok(cs)
+			}
+			Err(err) => {
+				Err(Error::Other { pos: self.pos(), source: Box::new(err) })
+			}
+		}
+	}
+
 
 	/// Sets the read position.
 	///
