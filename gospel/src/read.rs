@@ -1,3 +1,19 @@
+/*!
+
+Utilities for reading binary data from slices.
+
+Supports both little and big endian, but not runtime choice. See [`Reader`] for more information.
+
+In the common case that you only care about one endianness, the recommended usage is to import
+[`Le`] or [`Be`]:
+```rust
+use gospel::read::{Reader, Le as _};
+```
+
+The `as _` ensures that it does not conflict with the similarly-named [`write::Le`](`crate::write::Le`).
+
+*/
+
 use std::ffi::CStr;
 
 /// An error occurred when reading.
