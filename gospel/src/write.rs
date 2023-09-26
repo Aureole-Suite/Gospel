@@ -1,3 +1,19 @@
+/*!
+
+Utilities for writing binary data to a `Vec<u8>`, with support for delayed labels.
+
+Supports both little and big endian, but not runtime choice. See [`Writer`] for more information.
+
+In the common case that you only care about one endianness, the recommended usage is to import
+[`Le`] or [`Be`]:
+```rust
+use gospel::write::{Writer, Le as _};
+```
+
+The `as _` ensures that it does not conflict with the similarly-named [`read::Le`](`crate::read::Le`).
+
+*/
+
 use std::{
 	hash::Hash,
 	collections::HashMap,
@@ -7,15 +23,20 @@ use std::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+	/// Attempted to look up a label that was not defined.
 	#[error("undefined label {label:?} referenced at {pos:#X}")]
 	Label { pos: usize, label: Label },
+
+	/// Some other error happened.
 	#[error("error at {pos:#X}: {source}")]
 	Other { pos: usize, #[source] source: BoxError },
 }
 
+/// Type alias for `Result<T, Error>`.
 pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 impl Error {
+	/// The position the error happened at.
 	pub fn pos(&self) -> usize {
 		match self {
 			Error::Label { pos, .. } => *pos,
@@ -23,6 +44,9 @@ impl Error {
 		}
 	}
 
+	/// The position the error happened at, but mutably.
+	///
+	/// This can be useful for mapping errors in subslices.
 	pub fn pos_mut(&mut self) -> &mut usize {
 		match self {
 			Error::Label { pos, .. } => pos,
@@ -31,6 +55,7 @@ impl Error {
 	}
 }
 
+/// A label written through `delayN` does not fit in the given number of bits.
 #[derive(Clone, Debug, thiserror::Error)]
 #[error("attempted to write {value:#X} as a u{size}")]
 pub struct LabelSizeError {
@@ -41,7 +66,24 @@ pub struct LabelSizeError {
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type Delayed = Box<dyn FnOnce(&DelayContext, &mut [u8]) -> Result<(), BoxError>>;
 
+#[cfg(doc)]
+#[doc(hidden)]
+pub type T = ();
+
 /// An incremental writer to a `Vec<u8>`, with support for delayed labels.
+///
+/// One of the main points of interest is [`u32_le`](`Self::T`) and the like, which read the
+/// relevant primitives from the slice. In these docs, they are abbreviated to a single function
+/// for simplicity.
+///
+/// The other point of interest is the [`label`](`Writer::label`) and [`delay`](Writer::delay)
+/// functions. These allow writing delayed data that cannot be known before other data has been written;
+/// in particular sizes and offsets.
+///
+/// Supported primitives are `u8..=u128`, `i8..=i128`, `f32`, `f64`.
+///
+/// The functions are suffixed with either `_le` or `_be`, for endianness. To use unsuffixed
+/// versions, import either the [`Le`] or [`Be`] trait.
 #[derive(Default)]
 #[must_use]
 pub struct Writer {
@@ -106,74 +148,6 @@ impl Writer {
 		Ok(self.data)
 	}
 
-	/// Writes some data.
-	#[inline(always)]
-	pub fn slice(&mut self, data: &[u8]) {
-		self.data.extend_from_slice(data)
-	}
-
-	/// Writes some data.
-	///
-	/// This function is redundant, and exists only for symmetry.
-	#[inline(always)]
-	pub fn array<const N: usize>(&mut self, data: [u8; N]) {
-		self.slice(&data)
-	}
-
-	/// Places a label at the current position, so it can be referenced with [`delay`](`Self::delay`).
-	#[inline(always)]
-	pub fn label(&mut self, label: Label) {
-		self.put_label(label, self.len());
-	}
-
-	/// Creates and places a label at the current position.
-	#[inline(always)]
-	pub fn here(&mut self) -> Label {
-		let l = Label::new();
-		self.label(l);
-		l
-	}
-
-	fn put_label(&mut self, label: Label, pos: usize) {
-		if let Some(p) = self.labels.insert(label, pos) {
-			panic!("label already defined at 0x{p:04X}")
-		}
-	}
-
-	/// Writes some bytes to be filled in later.
-	///
-	/// The given closure is called with a function that allows looking up labels.
-	/// Other kinds of state are not currently officially allowed.
-	#[inline(always)]
-	pub fn delay<const N: usize, F>(&mut self, cb: F) where
-		F: FnOnce(&DelayContext) -> Result<[u8; N], BoxError> + 'static,
-	{
-		let start = self.len();
-		self.array([0; N]);
-		let end = self.len();
-		self.delays.push((start..end, Box::new(move |ctx, slice| {
-			slice.copy_from_slice(&cb(ctx)?);
-			Ok(())
-		})));
-	}
-
-	/// Concatenates two `Writer`s, including labels.
-	#[inline]
-	pub fn append(&mut self, mut other: Writer) {
-		let shift = self.len();
-		self.data.reserve(other.data.capacity());
-		self.data.append(&mut other.data);
-
-		for (range, cb) in other.delays {
-			let range = range.start+shift..range.end+shift;
-			self.delays.push((range, cb))
-		}
-
-		for (label, pos) in other.labels {
-			self.put_label(label, pos+shift);
-		}
-	}
-
 	/// Returns the number of bytes written so far, including delayed ones.
 	#[must_use]
 	#[inline(always)]
@@ -200,40 +174,109 @@ impl Writer {
 		self.data.capacity()
 	}
 
+	#[cfg(doc)]
+	/// Write a primitive from the input.
+	pub fn T(&mut self, val: T) {
+		self.array(T::to_bytes(val));
+	}
+
+	/// Writes some data.
+	#[inline(always)]
+	pub fn slice(&mut self, data: &[u8]) {
+		self.data.extend_from_slice(data)
+	}
+
+	/// Writes some data.
+	///
+	/// This function is redundant, and exists only for symmetry.
+	#[inline(always)]
+	pub fn array<const N: usize>(&mut self, data: [u8; N]) {
+		self.slice(&data)
+	}
+
+	/// Places a label at the current position, so it can be referenced with [`delay`](`Self::delay`).
+	///
+	/// Placing the same label twice results in a panic.
+	#[inline(always)]
+	pub fn label(&mut self, label: Label) {
+		self.put_label(label, self.len());
+	}
+
+	/// Creates and places a label at the current position.
+	#[inline(always)]
+	pub fn here(&mut self) -> Label {
+		let l = Label::new();
+		self.label(l);
+		l
+	}
+
+	#[cfg(doc)]
+	/// Write the address of a label.
+	///
+	/// [`finish`](`Self::finish`) will throw an error if the resulting address does not fit in the type.
+	pub fn delayN(&mut self, l: Label) {
+		self.delay(move |ctx| {
+			let value = ctx.label(label)?;
+			let value = uN::try_from(value).map_err(|_| LabelSizeError { value, size: N })?;
+			Ok(uN::to_bytes(value))
+		});
+	}
+
+	fn put_label(&mut self, label: Label, pos: usize) {
+		if let Some(p) = self.labels.insert(label, pos) {
+			panic!("label already defined at 0x{p:04X}")
+		}
+	}
+
+	/// Writes some bytes to be filled in later.
+	///
+	/// The given closure is called with a function that allows looking up labels.
+	/// Other kinds of state are not currently officially allowed.
+	#[inline(always)]
+	pub fn delay<const N: usize, F>(&mut self, cb: F) where
+		F: FnOnce(&DelayContext) -> Result<[u8; N], BoxError> + 'static,
+	{
+		let start = self.len();
+		self.array([0; N]);
+		let end = self.len();
+		self.delays.push((start..end, Box::new(move |ctx, slice| {
+			slice.copy_from_slice(&cb(ctx)?);
+			Ok(())
+		})));
+	}
+
+	#[cfg(doc)]
+	/// Creates a new `Writer` and delays a pointer to it.
+	///
+	/// This is a shorthand for the common pattern of `{ let mut g = Writer::new(); f.delayN(g.here()); g }`.
+	pub fn ptrN(&mut self) -> Writer {
+		let mut g = Writer::new();
+		self.delayN(g.here());
+		g
+	}
+
 	/// Writes null bytes until the length is a multiple of `size`.
 	#[inline(always)]
 	pub fn align(&mut self, size: usize) {
 		self.slice(&vec![0;(size-(self.len()%size))%size]);
 	}
-}
 
-#[cfg(doc)]
-#[doc(hidden)]
-pub type T = ();
+	/// Concatenates two `Writer`s, including labels.
+	#[inline]
+	pub fn append(&mut self, mut other: Writer) {
+		let shift = self.len();
+		self.data.reserve(other.data.capacity());
+		self.data.append(&mut other.data);
 
-/// Functions for writing primitives to the stream. The underlying functions are hidden from
-/// the docs for brevity.
-///
-/// Supported primitives are `u8..=u128`, `i8..=i128`, `f32`, `f64`.
-///
-/// The functions are suffixed with either `_le` or `_be`, for endianness. To use unsuffixed
-/// versions, import either the [`Le`] or [`Be`] trait.
-#[cfg(doc)]
-impl Writer {
-	// Could add a shitload of #[doc(alias = _)], but don't wanna.
+		for (range, cb) in other.delays {
+			let range = range.start+shift..range.end+shift;
+			self.delays.push((range, cb))
+		}
 
-	/// Write a primitive from the input.
-	pub fn T(&mut self, val: T) {}
-
-	/// Write the address of a label.
-	///
-	/// [`finish`](`Self::finish`) will throw an error if the resulting address does not fit in the type.
-	pub fn delayN(&mut self, l: Label) {}
-
-	/// Creates a new `Writer` and delays a pointer to it.
-	///
-	/// This is a shorthand for the common pattern of `{ let mut g = Writer::new(); f.delayN(g.here()); g }`.
-	pub fn ptrN(&mut self) -> Writer {}
+		for (label, pos) in other.labels {
+			self.put_label(label, pos+shift);
+		}
+	}
 }
 
 mod seal { pub trait Sealed: Sized {} }
@@ -248,17 +291,17 @@ macro_rules! primitives {
 	) => { paste::paste! {
 		// #[doc(hidden)]
 		impl Writer {
-			$(#[inline(always)] pub fn [<$type $suf>](&mut self, val: $type) {
+			$(#[doc(hidden)] #[inline(always)] pub fn [<$type $suf>](&mut self, val: $type) {
 				self.array($type::$conv(val));
 			})*
-			$(#[inline(always)] pub fn [<delay$ptr $suf>](&mut self, label: Label) {
+			$(#[doc(hidden)] #[inline(always)] pub fn [<delay$ptr $suf>](&mut self, label: Label) {
 				self.delay(move |ctx| {
 					let value = ctx.label(label)?;
 					let value = [<u$ptr>]::try_from(value).map_err(|_| LabelSizeError { value, size: $ptr })?;
 					Ok([<u$ptr>]::$conv(value))
 				});
 			})*
-			$(#[inline(always)] pub fn [<ptr$ptr $suf>](&mut self) -> Self {
+			$(#[doc(hidden)] #[inline(always)] pub fn [<ptr$ptr $suf>](&mut self) -> Self {
 				let mut g = Writer::new();
 				self.[<delay$ptr $suf>](g.here());
 				g
