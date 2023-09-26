@@ -116,43 +116,6 @@ impl<'a> Reader<'a> {
 		}
 	}
 
-	#[cfg(doc)]
-	/// Read a primitive from the input.
-	pub fn T(&mut self) -> Result<T> {}
-
-	/// Reads a slice of data from the input. No copying is done.
-	///
-	/// Returns an error if there is not enough data left, in which case the read position is
-	/// unchanged.
-	#[inline(always)]
-	pub fn slice(&mut self, len: usize) -> Result<&'a [u8]> {
-		if len > self.remaining().len() {
-			return Err(Error::Read { pos: self.pos(), len, size: self.len() });
-		}
-		let pos = self.pos;
-		self.pos += len;
-		Ok(&self.data[pos..pos+len])
-	}
-
-	/// Reads a fixed-size slice of data from the input.
-	///
-	/// Handles errors identically to [`slice`](`Self::slice`).
-	#[inline(always)]
-	pub fn array<const N: usize>(&mut self) -> Result<[u8; N]> {
-		let mut x = [0; N];
-		self.read_into(&mut x)?;
-		Ok(x)
-	}
-
-	/// Reads a slice of data into a preexisting buffer.
-	///
-	/// Handles errors identically to [`slice`](`Self::slice`).
-	#[inline(always)]
-	pub fn read_into(&mut self, buf: &mut [u8]) -> Result<()> {
-		buf.copy_from_slice(self.slice(buf.len())?);
-		Ok(())
-	}
-
 	/// Returns the read position of the reader.
 	///
 	/// To change the position, use [`seek`](`Self::seek`) or [`at`](`Self::at`).
@@ -196,6 +159,43 @@ impl<'a> Reader<'a> {
 	#[inline(always)]
 	pub fn data(&self) -> &'a [u8] {
 		self.data
+	}
+
+	#[cfg(doc)]
+	/// Read a primitive from the input.
+	pub fn T(&mut self) -> Result<T> {}
+
+	/// Reads a slice of data from the input. No copying is done.
+	///
+	/// Returns an error if there is not enough data left, in which case the read position is
+	/// unchanged.
+	#[inline(always)]
+	pub fn slice(&mut self, len: usize) -> Result<&'a [u8]> {
+		if len > self.remaining().len() {
+			return Err(Error::Read { pos: self.pos(), len, size: self.len() });
+		}
+		let pos = self.pos;
+		self.pos += len;
+		Ok(&self.data[pos..pos+len])
+	}
+
+	/// Reads a fixed-size slice of data from the input.
+	///
+	/// Handles errors identically to [`slice`](`Self::slice`).
+	#[inline(always)]
+	pub fn array<const N: usize>(&mut self) -> Result<[u8; N]> {
+		let mut x = [0; N];
+		self.read_into(&mut x)?;
+		Ok(x)
+	}
+
+	/// Reads a slice of data into a preexisting buffer.
+	///
+	/// Handles errors identically to [`slice`](`Self::slice`).
+	#[inline(always)]
+	pub fn read_into(&mut self, buf: &mut [u8]) -> Result<()> {
+		buf.copy_from_slice(self.slice(buf.len())?);
+		Ok(())
 	}
 
 	/// Sets the read position.
