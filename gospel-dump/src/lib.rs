@@ -2,7 +2,7 @@
 
 Pretty nice printing of hex dumps.
 
-This is intended to be used alongside `gospel` with the [`dump`] function, but can be used with
+This is intended to be used alongside `gospel` with the `Reader::dump` function, but can be used with
 plain byte slices with [`Dump::new`].
 
 See [`Dump`] for main documentation.
@@ -27,14 +27,6 @@ pub struct Dump<'a> {
 	num_width_as: usize,
 	#[allow(clippy::type_complexity)]
 	preview: Option<Box<dyn Fn(&[u8]) -> String + 'static>>,
-}
-
-/// Creates a dump of a [`gospel::read::Reader`].
-///
-/// Only available when the `gospel` feature is enabled, which it is by default.
-#[cfg(feature = "gospel")]
-pub fn dump<'a>(f: &gospel::read::Reader<'a>) -> Dump<'a> {
-	Dump::new(f.data()).start(f.pos())
 }
 
 impl<'a> Dump<'a> {

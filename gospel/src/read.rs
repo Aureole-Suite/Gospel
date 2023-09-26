@@ -325,6 +325,14 @@ impl<'a> Reader<'a> {
 		}
 		Ok(())
 	}
+
+	/// Creates a hexdump of the data at the current position.
+	///
+	/// Only available with the `dump` feature is enabled.
+	#[cfg(feature = "dump")]
+	pub fn dump(&self) -> crate::dump::Dump<'a> {
+		crate::dump::Dump::new(self.data()).start(self.pos())
+	}
 }
 
 mod seal { pub trait Sealed: Sized {} }

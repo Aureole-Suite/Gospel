@@ -7,10 +7,3 @@ description = "Simple hex dump"
 repository = "https://github.com/Aureole-Suite/Gospel"
 license = "MIT OR Apache-2.0"
 keywords = ["hex", "dump", "hexdump"]
-
-[dependencies]
-gospel.path = "../gospel"
-gospel.optional = true
-
-[features]
-default = ["gospel"]

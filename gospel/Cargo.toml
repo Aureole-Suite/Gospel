@@ -12,3 +12,8 @@ categories = ["parsing"]
 [dependencies]
 thiserror = "1.0.35"
 paste = "1.0.7"
+gospel-dump.path = "../gospel-dump"
+gospel-dump.optional = true
+
+[features]
+dump = ["gospel-dump"]
