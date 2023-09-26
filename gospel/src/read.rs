@@ -1,16 +1,26 @@
+/// An error occurred when reading.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[error("out-of-bounds seek to {pos:#X} (size {size:#X})")]
-	Seek { pos: usize, size: usize },
+	/// Attempted to read mode data than is available.
 	#[error("out-of-bounds read of {pos:#X}+{len} (size {size:#X})")]
 	Read { pos: usize, len: usize, size: usize },
+
+	/// Attempted to [`seek`](`Reader::seek`) to an out-of-bounds position.
+	#[error("out-of-bounds seek to {pos:#X} (size {size:#X})")]
+	Seek { pos: usize, size: usize },
+
+	/// Some other error happened.
+	///
+	/// This is normally used by [`check`](`Reader::check`), but can be used to embed any error you want.
 	#[error("error at {pos:#X}: {source}")]
 	Other { pos: usize, #[source] source: Box<dyn std::error::Error + Send + Sync> },
 }
 
+/// Type alias for `Result<T, Error>`.
 pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 impl Error {
+	/// The position the error happened at.
 	pub fn pos(&self) -> usize {
 		match self {
 			Error::Seek { pos, .. } => *pos,
@@ -19,6 +29,9 @@ impl Error {
 		}
 	}
 
+	/// The position the error happened at, but mutably.
+	///
+	/// This can be useful for mapping errors in subslices.
 	pub fn pos_mut(&mut self) -> &mut usize {
 		match self {
 			Error::Seek { pos, .. } => pos,
@@ -28,6 +41,7 @@ impl Error {
 	}
 }
 
+/// A [`check_T`](`Reader::check_T`) failed.
 #[derive(Clone, Debug, thiserror::Error)]
 #[error("mismatched {type_}. expected: {expected}, got: {got}", type_ = std::any::type_name::<T>())]
 pub struct CheckError<T: std::fmt::Display> {
@@ -35,6 +49,9 @@ pub struct CheckError<T: std::fmt::Display> {
 	pub got: T,
 }
 
+/// A [`check`](`Reader::check`) failed.
+///
+/// This is different type from [`CheckError`] in order to display the message in a nicer way.
 #[derive(Clone, Debug, thiserror::Error)]
 pub struct CheckBytesError {
 	pub expected: Vec<u8>,
@@ -57,9 +74,22 @@ impl std::fmt::Display for CheckBytesError {
 	}
 }
 
+#[cfg(doc)]
+#[doc(hidden)]
+pub type T = ();
+
 /// An incremental reader from a byte slice.
 ///
-/// Cloning this type is cheap, but it does not implement [`Copy`] for similar reasons as
+/// The main functions of interest are [`u32_le`](`Self::T`) and the like, which read the relevant
+/// primitives from the slice. In these docs, they are abbreviated to a single function for
+/// simplicity.
+///
+/// Supported primitives are `u8..=u128`, `i8..=i128`, `f32`, `f64`.
+///
+/// The functions are suffixed with either `_le` or `_be`, for endianness. To use unsuffixed
+/// versions, import either the [`Le`] or [`Be`] trait.
+///
+/// Cloning a `Reader` is cheap, but it does not implement [`Copy`] for similar reasons as
 /// [`Range`](`std::ops::Range`).
 #[derive(Clone)]
 pub struct Reader<'a> {
@@ -85,6 +115,10 @@ impl<'a> Reader<'a> {
 			data,
 		}
 	}
+
+	#[cfg(doc)]
+	/// Read a primitive from the input.
+	pub fn T(&mut self) -> Result<T> {}
 
 	/// Reads a slice of data from the input. No copying is done.
 	///
@@ -227,36 +261,21 @@ impl<'a> Reader<'a> {
 		}
 		Ok(())
 	}
-}
 
-#[cfg(doc)]
-#[doc(hidden)]
-pub type T = ();
-
-/// Functions for reading primitives from the stream. The underlying functions are hidden from
-/// the docs for brevity.
-///
-/// Supported primitives are `u8..=u128`, `i8..=i128`, `f32`, `f64`.
-///
-/// The functions are suffixed with either `_le` or `_be`, for endianness. To use unsuffixed
-/// versions, import either the [`Le`] or [`Be`] trait.
-#[cfg(doc)]
-impl Reader<'_> {
-	// Could add a shitload of #[doc(alias = _)], but don't wanna.
-
-	/// Read a primitive from the input.
-	pub fn T(&mut self) -> Result<T> {}
-
+	#[cfg(doc)]
 	/// Read a primitive from the input, giving an error if it is not as expected.
 	///
 	/// If it not match, the read position is not affected.
 	pub fn check_T(&mut self, v: T) -> Result<()> {}
 
+	#[cfg(doc)]
 	/// Read a `uN` primitive from the input, and return a new `Reader` at that position.
 	///
 	/// This is a shorthand for the common pattern of `f.clone().at(f.uN()? as usize)?`.
 	///
-	/// Note that no checking is made that the value actually fits inside a `usize`; the higher bits are simply discarded.
+	/// Note that no checking is made that the value actually fits inside a `usize`;
+	/// the higher bits are simply discarded. This is primarily relevant with `ptr128`,
+	/// and requires humongous amounts of memory to exhibit issues.
 	pub fn ptrN(&mut self) -> Result<Self> {}
 }
 
