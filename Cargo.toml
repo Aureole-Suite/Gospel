@@ -1,0 +1,6 @@
+[workspace]
+members = [
+	"gospel",
+	"gospel-dump",
+]
+resolver = "2"
