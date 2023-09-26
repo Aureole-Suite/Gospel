@@ -21,6 +21,7 @@ use std::{
 	ops::Range,
 };
 
+/// An error occurred when writing.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	/// Attempted to look up a label that was not defined.
@@ -28,6 +29,8 @@ pub enum Error {
 	Label { pos: usize, label: Label },
 
 	/// Some other error happened.
+	///
+	/// This is currently not produced by this library, but can be useful for returning arbitrary errors from [`delay`](Writer::delay).
 	#[error("error at {pos:#X}: {source}")]
 	Other { pos: usize, #[source] source: BoxError },
 }
@@ -356,6 +359,7 @@ primitives!(
 	{ 8, 16, 32, 64, 128 }
 );
 
+/// A label that can be placed and referenced with [`label`](Writer::label) and [`delayN`](Writer::delayN).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label(u64);
 
@@ -366,6 +370,10 @@ impl Debug for Label {
 }
 
 impl Label {
+	/// Produces a new unique label.
+	///
+	/// This is currently implemented with an `AtomicU64`. If one label is created every
+	/// nanosecond, this would overflow in 584 years.
 	#[allow(clippy::new_without_default)]
 	pub fn new() -> Label {
 		use std::sync::atomic::{AtomicU64, Ordering};
@@ -374,6 +382,9 @@ impl Label {
 		Label(n)
 	}
 
+	/// Produces a label with a known identity.
+	///
+	/// This can be useful in cases where passing data around is difficult, but a unique label can be produced in different ways.
 	pub fn known(n: u32) -> Label {
 		let n = n as u64 | 0xFFFFFFFF00000000;
 		Label(n)
