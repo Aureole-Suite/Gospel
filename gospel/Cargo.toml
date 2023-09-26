@@ -2,6 +2,12 @@
 name = "gospel"
 version = "0.1.0"
 edition = "2021"
+authors = ["Kyuuhachi <caagr98@gmail.com>"]
+description = "Incremental byte munching"
+repository = "https://github.com/Aureole-Suite/Gospel"
+license = "MIT OR Apache-2.0"
+keywords = ["parser", "incremental", "parsing", "byte"]
+categories = ["parsing"]
 
 [dependencies]
 thiserror = "1.0.35"
