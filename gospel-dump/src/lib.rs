@@ -1,31 +1,55 @@
+/*!
+
+Pretty nice printing of hex dumps.
+
+This is intended to be used alongside `gospel` with the [`dump`] function, but can be used with
+plain byte slices with [`Dump::new`].
+
+See [`Dump`] for main documentation.
+
+*/
+
 use std::fmt;
 
+/// A hex dump of a byte slice.
+///
+/// This can be printed with `{:x}`, `{:X}`, or `{:b}` specifiers, to show the dump in the
+/// specified format. In addition, it supports the following format specifiers:
+///
+/// - `#`: enable ANSI color escape codes
+/// - `N`: number of lines to write (defaults to printing until the end)
+/// - `.M`: number of bytes per line (defaults to as many as fits inside 240 terminal columns)
 #[must_use]
 pub struct Dump<'a> {
 	start: usize,
 	end: usize,
 	data: &'a [u8],
-	length_as: usize,
+	num_width_as: usize,
 	#[allow(clippy::type_complexity)]
 	preview: Option<Box<dyn Fn(&[u8]) -> String + 'static>>,
 }
 
+/// Creates a dump of a [`gospel::read::Reader`].
+///
+/// Only available when the `gospel` feature is enabled, which it is by default.
 #[cfg(feature = "gospel")]
 pub fn dump<'a>(f: &gospel::read::Reader<'a>) -> Dump<'a> {
 	Dump::new(f.data()).start(f.pos())
 }
 
 impl<'a> Dump<'a> {
+	/// Creates a dump of a byte slice.
 	pub fn new(data: &'a [u8]) -> Self {
 		Self {
 			start: 0,
 			end: data.len(),
 			data,
-			length_as: data.len(),
+			num_width_as: data.len(),
 			preview: Some(Box::new(|a| String::from_utf8_lossy(a).into_owned()))
 		}
 	}
 
+	/// Sets the starting point of the dump.
 	pub fn start(self, start: usize) -> Self {
 		Self {
 			start,
@@ -33,6 +57,9 @@ impl<'a> Dump<'a> {
 		}
 	}
 
+	/// Sets the end point of the dump.
+	///
+	/// Options passed when printing will have priority.
 	pub fn end(self, end: usize) -> Self {
 		Self {
 			end,
@@ -40,13 +67,27 @@ impl<'a> Dump<'a> {
 		}
 	}
 
-	pub fn length_as(self, length_as: usize) -> Self {
+	/// Sets the end point of the dump, relative to the starting point.
+	///
+	/// Options passed when printing will have priority.
+	pub fn len(self, len: usize) -> Self {
 		Self {
-			length_as,
+			end: self.start + len,
 			..self
 		}
 	}
 
+	/// Sets the number of digits to display for the byte offset to fit the given number.
+	pub fn num_width_as(self, num_width_as: usize) -> Self {
+		Self {
+			num_width_as,
+			..self
+		}
+	}
+
+	/// Set a function to use for displaying the unicode preview.
+	///
+	/// By default, this uses `String::from_utf8_lossy()`.
 	pub fn preview(self, preview: impl Fn(&[u8]) -> String + 'static) -> Self {
 		Self {
 			preview: Some(Box::new(preview)),
@@ -54,6 +95,7 @@ impl<'a> Dump<'a> {
 		}
 	}
 
+	/// Removes the unicode preview.
 	pub fn no_preview(self) -> Self {
 		Self {
 			preview: None,
@@ -89,10 +131,10 @@ impl Dump<'_> {
 	) -> fmt::Result {
 		const SCREEN_WIDTH: usize = 240;
 
-		let num_width = if self.length_as == 0 {
+		let num_width = if self.num_width_as == 0 {
 			0
 		} else {
-			format!("{:X}", self.length_as).len()
+			format!("{:X}", self.num_width_as).len()
 		};
 
 		let has_text = !f.sign_minus();
