@@ -189,10 +189,26 @@ impl<'a> Reader<'a> {
 		Ok(a)
 	}
 
-	/// Rounds the read position up to the next multiple of `size`.
+	/// Rounds the read position up to the next multiple of `size`, returning the skipped data.
 	#[inline(always)]
 	pub fn align(&mut self, size: usize) -> Result<&'a [u8]> {
 		self.slice((size-(self.pos()%size))%size)
+	}
+
+	/// Rounds the read position up to the next multiple of `size`, returning an error if the skipped bytes are nonzero.
+	#[inline(always)]
+	pub fn align_zeroed(&mut self, size: usize) -> Result<()> {
+		let pos = self.pos();
+		let u = self.align(size)?;
+		if u.iter().any(|a| *a != 0) {
+			self.pos = pos;
+			let v = vec![0; size];
+			return Err(Error::Other { pos, source: CheckBytesError {
+				got:      u.to_owned(),
+				expected: v.to_owned(),
+			}.into() })
+		}
+		Ok(())
 	}
 
 	/// Reads a number of bytes and returns an error if they are not as expected.
