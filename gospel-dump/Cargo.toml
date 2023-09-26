@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 gospel.path = "../gospel"
+gospel.optional = true
+
+[features]
+default = ["gospel"]

@@ -1,5 +1,4 @@
 use std::fmt;
-use gospel::read::Reader;
 
 #[must_use]
 pub struct Dump<'a> {
@@ -11,17 +10,22 @@ pub struct Dump<'a> {
 	preview: Option<Box<dyn Fn(&[u8]) -> String + 'static>>,
 }
 
-pub fn dump<'a>(f: &Reader<'a>) -> Dump<'a> {
-	Dump {
-		start: f.pos(),
-		end: f.len(),
-		data: f.data(),
-		length_as: f.len(),
-		preview: Some(Box::new(|a| String::from_utf8_lossy(a).into_owned()))
-	}
+#[cfg(feature = "gospel")]
+pub fn dump<'a>(f: &gospel::read::Reader<'a>) -> Dump<'a> {
+	Dump::new(f.data()).start(f.pos())
 }
 
-impl Dump<'_> {
+impl<'a> Dump<'a> {
+	pub fn new(data: &'a [u8]) -> Self {
+		Self {
+			start: 0,
+			end: data.len(),
+			data,
+			length_as: data.len(),
+			preview: Some(Box::new(|a| String::from_utf8_lossy(a).into_owned()))
+		}
+	}
+
 	pub fn start(self, start: usize) -> Self {
 		Self {
 			start,
