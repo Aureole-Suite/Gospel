@@ -182,7 +182,7 @@ impl<'a> Reader<'a> {
 	#[cfg(doc)]
 	/// Read a primitive from the input.
 	pub fn T(&mut self) -> Result<T> {
-		Ok(T::to_bytes(self.array()?))
+		Ok(T::from_bytes(self.array()?))
 	}
 
 	/// Reads a slice of data from the input. No copying is done.
