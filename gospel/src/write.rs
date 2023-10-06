@@ -30,7 +30,7 @@ pub enum Error {
 
 	/// Some other error happened.
 	///
-	/// This is currently not produced by this library, but can be useful for returning arbitrary errors from [`delay`](Writer::delay).
+	/// This is currently not produced by this library, but can be useful for returning arbitrary errors from [`label`](Writer::label).
 	#[error("error at {pos:#X}: {source}")]
 	Other { pos: usize, #[source] source: BoxError },
 }
@@ -58,7 +58,7 @@ impl Error {
 	}
 }
 
-/// A label written through `delayN` does not fit in the given number of bits.
+/// A label written through `labelN` does not fit in the given number of bits.
 #[derive(Clone, Debug, thiserror::Error)]
 #[error("attempted to write {value:#X} as a u{size}")]
 pub struct LabelSizeError {
@@ -79,7 +79,7 @@ pub type T = ();
 /// relevant primitives from the slice. In these docs, they are abbreviated to a single function
 /// for simplicity.
 ///
-/// The other point of interest is the [`label`](`Writer::label`) and [`delay`](Writer::delay)
+/// The other point of interest is the [`place`](`Writer::place`) and [`label`](Writer::label)
 /// functions. These allow writing delayed data that cannot be known before other data has been written;
 /// in particular sizes and offsets.
 ///
@@ -197,11 +197,11 @@ impl Writer {
 		self.slice(&data)
 	}
 
-	/// Places a label at the current position, so it can be referenced with [`delay`](`Self::delay`).
+	/// Places a label at the current position, so it can be referenced with [`labelN`](`Self::labelN`).
 	///
 	/// Placing the same label twice results in a panic.
 	#[inline(always)]
-	pub fn label(&mut self, label: Label) {
+	pub fn place(&mut self, label: Label) {
 		self.put_label(label, self.len());
 	}
 
@@ -209,7 +209,7 @@ impl Writer {
 	#[inline(always)]
 	pub fn here(&mut self) -> Label {
 		let l = Label::new();
-		self.label(l);
+		self.place(l);
 		l
 	}
 
@@ -217,7 +217,7 @@ impl Writer {
 	/// Write the address of a label.
 	///
 	/// [`finish`](`Self::finish`) will throw an error if the resulting address does not fit in the type.
-	pub fn delayN(&mut self, l: Label) {
+	pub fn labelN(&mut self, l: Label) {
 		self.delay(move |ctx| {
 			Ok(uN::to_bytes(ctx.label(l)? as uN))
 		});
@@ -306,7 +306,7 @@ macro_rules! primitives {
 			$(#[doc(hidden)] #[inline(always)] pub fn [<$type $suf>](&mut self, val: $type) {
 				self.array($type::$conv(val));
 			})*
-			$(#[doc(hidden)] #[inline(always)] pub fn [<delay$ptr $suf>](&mut self, label: Label) {
+			$(#[doc(hidden)] #[inline(always)] pub fn [<label$ptr $suf>](&mut self, label: Label) {
 				self.delay(move |ctx| {
 					let value = ctx.label(label)?;
 					let value = [<u$ptr>]::try_from(value).map_err(|_| LabelSizeError { value, size: $ptr })?;
@@ -324,7 +324,7 @@ macro_rules! primitives {
 			})*
 			$(#[doc(hidden)] #[inline(always)] pub fn [<ptr$ptr $suf>](&mut self) -> Self {
 				let mut g = Writer::new();
-				self.[<delay$ptr $suf>](g.here());
+				self.[<label$ptr $suf>](g.here());
 				g
 			})*
 		}
@@ -332,7 +332,7 @@ macro_rules! primitives {
 		$(#[$trait_attrs])*
 		pub trait $trait: seal::Sealed {
 			$(#[doc(hidden)] fn $type(&mut self, val: $type);)*
-			$(#[doc(hidden)] fn [<delay$ptr>](&mut self, label: Label);)*
+			$(#[doc(hidden)] fn [<label$ptr>](&mut self, label: Label);)*
 			$(#[doc(hidden)] fn [<diff$ptr>](&mut self, start: Label, end: Label);)*
 			$(#[doc(hidden)] fn [<ptr$ptr>](&mut self) -> Self;)*
 		}
@@ -341,8 +341,8 @@ macro_rules! primitives {
 			$(#[doc(hidden)] #[inline(always)] fn $type(&mut self, val: $type) {
 				self.[<$type $suf>](val)
 			})*
-			$(#[doc(hidden)] #[inline(always)] fn [<delay$ptr>](&mut self, label: Label) {
-				self.[<delay$ptr $suf>](label)
+			$(#[doc(hidden)] #[inline(always)] fn [<label$ptr>](&mut self, label: Label) {
+				self.[<label$ptr $suf>](label)
 			})*
 			$(#[doc(hidden)] #[inline(always)] fn [<diff$ptr>](&mut self, start: Label, end: Label) {
 				self.[<diff$ptr $suf>](start, end)
@@ -381,7 +381,7 @@ primitives!(
 	{ 8, 16, 32, 64, 128 }
 );
 
-/// A label that can be placed and referenced with [`label`](Writer::label) and [`delayN`](Writer::delayN).
+/// A label that can be placed and referenced with [`place`](Writer::place) and [`labelN`](Writer::labelN).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label(u64);
 
