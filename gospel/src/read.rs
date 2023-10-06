@@ -181,9 +181,7 @@ impl<'a> Reader<'a> {
 
 	#[cfg(doc)]
 	/// Read a primitive from the input.
-	pub fn T(&mut self) -> Result<T> {
-		Ok(T::from_bytes(self.array()?))
-	}
+	pub fn T(&mut self) -> Result<T> {}
 
 	/// Reads a slice of data from the input. No copying is done.
 	///
@@ -279,18 +277,7 @@ impl<'a> Reader<'a> {
 	/// Read a primitive from the input, giving an error if it is not as expected.
 	///
 	/// If it not match, the read position is not affected.
-	pub fn check_T(&mut self, v: T) -> Result<()> {
-		let pos = self.pos();
-		let u = self.T()?;
-		if u != v {
-			self.pos = pos;
-			return Err(Error::Other { pos, source: CheckError {
-				got: u,
-				expected: v,
-			}.into() })
-		}
-		Ok(())
-	}
+	pub fn check_T(&mut self, v: T) -> Result<()> {}
 
 	#[cfg(doc)]
 	/// Read a `uN` primitive from the input, and return a new `Reader` at that position.
@@ -300,9 +287,7 @@ impl<'a> Reader<'a> {
 	/// Note that no checking is made that the value actually fits inside a `usize`;
 	/// the higher bits are simply discarded. This is primarily relevant with `ptr128`,
 	/// and requires humongous amounts of memory to exhibit issues.
-	pub fn ptrN(&mut self) -> Result<Self> {
-		self.clone().at(self.uN()? as usize)
-	}
+	pub fn ptrN(&mut self) -> Result<Self> {}
 
 	/// Rounds the read position up to the next multiple of `size`, returning the skipped data.
 	#[inline(always)]

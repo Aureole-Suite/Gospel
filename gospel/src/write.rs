@@ -179,9 +179,7 @@ impl Writer {
 
 	#[cfg(doc)]
 	/// Write a primitive from the input.
-	pub fn T(&mut self, val: T) {
-		self.array(T::to_bytes(val));
-	}
+	pub fn T(&mut self, val: T) {}
 
 	/// Writes some data.
 	#[inline(always)]
@@ -217,22 +215,13 @@ impl Writer {
 	/// Write the address of a label.
 	///
 	/// [`finish`](`Self::finish`) will throw an error if the resulting address does not fit in the type.
-	pub fn labelN(&mut self, l: Label) {
-		self.delay(move |ctx| {
-			Ok(uN::to_bytes(ctx.label(l)? as uN))
-		});
-	}
+	pub fn labelN(&mut self, l: Label) {}
 
 	#[cfg(doc)]
 	/// Write the difference between two labels.
 	///
 	/// [`finish`](`Self::finish`) will throw an error if the resulting value does not fit in the type.
-	pub fn diffN(&mut self, start: Label, end: Label) {
-		self.delay(move |ctx| {
-			let value = ctx.label(end)? - ctx.label(start)?;
-			Ok(uN::to_bytes(value as uN))
-		});
-	}
+	pub fn diffN(&mut self, start: Label, end: Label) {}
 
 	fn put_label(&mut self, label: Label, pos: usize) {
 		if let Some(p) = self.labels.insert(label, pos) {
@@ -261,11 +250,7 @@ impl Writer {
 	/// Creates a new `Writer` and delays a pointer to it.
 	///
 	/// This is a shorthand for the common pattern of `{ let mut g = Writer::new(); f.delayN(g.here()); g }`.
-	pub fn ptrN(&mut self) -> Writer {
-		let mut g = Writer::new();
-		self.delayN(g.here());
-		g
-	}
+	pub fn ptrN(&mut self) -> Writer {}
 
 	/// Writes null bytes until the length is a multiple of `size`.
 	#[inline(always)]
