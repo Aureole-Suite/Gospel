@@ -219,9 +219,18 @@ impl Writer {
 	/// [`finish`](`Self::finish`) will throw an error if the resulting address does not fit in the type.
 	pub fn delayN(&mut self, l: Label) {
 		self.delay(move |ctx| {
-			let value = ctx.label(label)?;
-			let value = uN::try_from(value).map_err(|_| LabelSizeError { value, size: N })?;
-			Ok(uN::to_bytes(value))
+			Ok(uN::to_bytes(ctx.label(l)? as uN))
+		});
+	}
+
+	#[cfg(doc)]
+	/// Write the difference between two labels.
+	///
+	/// [`finish`](`Self::finish`) will throw an error if the resulting value does not fit in the type.
+	pub fn diffN(&mut self, start: Label, end: Label) {
+		self.delay(move |ctx| {
+			let value = ctx.label(end)? - ctx.label(start)?;
+			Ok(uN::to_bytes(value as uN))
 		});
 	}
 
@@ -304,6 +313,15 @@ macro_rules! primitives {
 					Ok([<u$ptr>]::$conv(value))
 				});
 			})*
+			$(#[doc(hidden)] #[inline(always)] pub fn [<diff$ptr $suf>](&mut self, start: Label, end: Label) {
+				self.delay(move |ctx| {
+					let start = ctx.label(start)?;
+					let end = ctx.label(end)?;
+					let value = end - start;
+					let value = [<u$ptr>]::try_from(value).map_err(|_| LabelSizeError { value, size: $ptr })?;
+					Ok([<u$ptr>]::$conv(value))
+				});
+			})*
 			$(#[doc(hidden)] #[inline(always)] pub fn [<ptr$ptr $suf>](&mut self) -> Self {
 				let mut g = Writer::new();
 				self.[<delay$ptr $suf>](g.here());
@@ -315,6 +333,7 @@ macro_rules! primitives {
 		pub trait $trait: seal::Sealed {
 			$(#[doc(hidden)] fn $type(&mut self, val: $type);)*
 			$(#[doc(hidden)] fn [<delay$ptr>](&mut self, label: Label);)*
+			$(#[doc(hidden)] fn [<diff$ptr>](&mut self, start: Label, end: Label);)*
 			$(#[doc(hidden)] fn [<ptr$ptr>](&mut self) -> Self;)*
 		}
 
@@ -324,6 +343,9 @@ macro_rules! primitives {
 			})*
 			$(#[doc(hidden)] #[inline(always)] fn [<delay$ptr>](&mut self, label: Label) {
 				self.[<delay$ptr $suf>](label)
+			})*
+			$(#[doc(hidden)] #[inline(always)] fn [<diff$ptr>](&mut self, start: Label, end: Label) {
+				self.[<diff$ptr $suf>](start, end)
 			})*
 			$(#[doc(hidden)] #[inline(always)] fn [<ptr$ptr>](&mut self) -> Self {
 				self.[<ptr$ptr $suf>]()
