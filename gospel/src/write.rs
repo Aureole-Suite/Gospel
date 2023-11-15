@@ -388,12 +388,4 @@ impl Label {
 		let n = COUNT.fetch_add(1, Ordering::Relaxed);
 		Label(n)
 	}
-
-	/// Produces a label with a known identity.
-	///
-	/// This can be useful in cases where passing data around is difficult, but a unique label can be produced in different ways.
-	pub fn known(n: u32) -> Label {
-		let n = n as u64 | 0xFFFFFFFF00000000;
-		Label(n)
-	}
 }
