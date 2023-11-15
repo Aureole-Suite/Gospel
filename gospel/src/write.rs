@@ -212,16 +212,10 @@ impl Writer {
 	}
 
 	#[cfg(doc)]
-	/// Write the address of a label.
-	///
-	/// [`finish`](`Self::finish`) will throw an error if the resulting address does not fit in the type.
-	pub fn labelN(&mut self, l: Label) {}
-
-	#[cfg(doc)]
 	/// Write the difference between two labels.
 	///
 	/// [`finish`](`Self::finish`) will throw an error if the resulting value does not fit in the type.
-	pub fn diffN(&mut self, start: Label, end: Label) {}
+	pub fn offsetN(&mut self, start: Label, end: Label) {}
 
 	fn put_label(&mut self, label: Label, pos: usize) {
 		if let Some(p) = self.labels.insert(label, pos) {
@@ -249,8 +243,8 @@ impl Writer {
 	#[cfg(doc)]
 	/// Creates a new `Writer` and delays a pointer to it.
 	///
-	/// This is a shorthand for the common pattern of `{ let mut g = Writer::new(); f.delayN(g.here()); g }`.
-	pub fn ptrN(&mut self) -> Writer {}
+	/// This is a shorthand for the common pattern of `{ let mut g = Writer::new(); f.offsetN(rel, g.here()); g }`.
+	pub fn ptrN(&mut self, rel: Label) -> Writer {}
 
 	/// Writes null bytes until the length is a multiple of `size`.
 	#[inline(always)]
@@ -291,14 +285,7 @@ macro_rules! primitives {
 			$(#[doc(hidden)] #[inline(always)] pub fn [<$type $suf>](&mut self, val: $type) {
 				self.array($type::$conv(val));
 			})*
-			$(#[doc(hidden)] #[inline(always)] pub fn [<label$ptr $suf>](&mut self, label: Label) {
-				self.delay(move |ctx| {
-					let value = ctx.label(label)?;
-					let value = [<u$ptr>]::try_from(value).map_err(|_| LabelSizeError { value, size: $ptr })?;
-					Ok([<u$ptr>]::$conv(value))
-				});
-			})*
-			$(#[doc(hidden)] #[inline(always)] pub fn [<diff$ptr $suf>](&mut self, start: Label, end: Label) {
+			$(#[doc(hidden)] #[inline(always)] pub fn [<offset$ptr $suf>](&mut self, start: Label, end: Label) {
 				self.delay(move |ctx| {
 					let start = ctx.label(start)?;
 					let end = ctx.label(end)?;
@@ -307,9 +294,9 @@ macro_rules! primitives {
 					Ok([<u$ptr>]::$conv(value))
 				});
 			})*
-			$(#[doc(hidden)] #[inline(always)] pub fn [<ptr$ptr $suf>](&mut self) -> Self {
+			$(#[doc(hidden)] #[inline(always)] pub fn [<ptr$ptr $suf>](&mut self, rel: Label) -> Self {
 				let mut g = Writer::new();
-				self.[<label$ptr $suf>](g.here());
+				self.[<offset$ptr $suf>](rel, g.here());
 				g
 			})*
 		}
@@ -317,23 +304,19 @@ macro_rules! primitives {
 		$(#[$trait_attrs])*
 		pub trait $trait: seal::Sealed {
 			$(#[doc(hidden)] fn $type(&mut self, val: $type);)*
-			$(#[doc(hidden)] fn [<label$ptr>](&mut self, label: Label);)*
-			$(#[doc(hidden)] fn [<diff$ptr>](&mut self, start: Label, end: Label);)*
-			$(#[doc(hidden)] fn [<ptr$ptr>](&mut self) -> Self;)*
+			$(#[doc(hidden)] fn [<offset$ptr>](&mut self, start: Label, end: Label);)*
+			$(#[doc(hidden)] fn [<ptr$ptr>](&mut self, rel: Label) -> Self;)*
 		}
 
 		impl $trait for Writer {
 			$(#[doc(hidden)] #[inline(always)] fn $type(&mut self, val: $type) {
 				self.[<$type $suf>](val)
 			})*
-			$(#[doc(hidden)] #[inline(always)] fn [<label$ptr>](&mut self, label: Label) {
-				self.[<label$ptr $suf>](label)
+			$(#[doc(hidden)] #[inline(always)] fn [<offset$ptr>](&mut self, start: Label, end: Label) {
+				self.[<offset$ptr $suf>](start, end)
 			})*
-			$(#[doc(hidden)] #[inline(always)] fn [<diff$ptr>](&mut self, start: Label, end: Label) {
-				self.[<diff$ptr $suf>](start, end)
-			})*
-			$(#[doc(hidden)] #[inline(always)] fn [<ptr$ptr>](&mut self) -> Self {
-				self.[<ptr$ptr $suf>]()
+			$(#[doc(hidden)] #[inline(always)] fn [<ptr$ptr>](&mut self, rel: Label) -> Self {
+				self.[<ptr$ptr $suf>](rel)
 			})*
 		}
 	} }
