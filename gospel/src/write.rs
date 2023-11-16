@@ -349,7 +349,7 @@ primitives!(
 	{ 8, 16, 32, 64, 128 }
 );
 
-/// A label that can be placed and referenced with [`place`](Writer::place) and [`labelN`](Writer::labelN).
+/// A label that can be placed and referenced with [`place`](Writer::place) and [`offsetN`](Writer::offsetN).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label(u64);
 
@@ -364,11 +364,16 @@ impl Label {
 	///
 	/// This is currently implemented with an `AtomicU64`. If one label is created every
 	/// nanosecond, this would overflow in 584 years.
-	#[allow(clippy::new_without_default)]
 	pub fn new() -> Label {
 		use std::sync::atomic::{AtomicU64, Ordering};
 		static COUNT: AtomicU64 = AtomicU64::new(0);
 		let n = COUNT.fetch_add(1, Ordering::Relaxed);
 		Label(n)
+	}
+}
+
+impl Default for Label {
+	fn default() -> Self {
+		Self::new()
 	}
 }
