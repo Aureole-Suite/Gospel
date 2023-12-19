@@ -218,7 +218,7 @@ impl<'a> Reader<'a> {
 
 	/// Reads data to and including the next null byte.
 	#[inline(always)]
-	pub fn cstr(&mut self) -> Result<&CStr> {
+	pub fn cstr(&mut self) -> Result<&'a CStr> {
 		match CStr::from_bytes_until_nul(self.remaining()) {
 			Ok(cs) => {
 				self.pos += cs.to_bytes_with_nul().len();
