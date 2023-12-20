@@ -1,9 +1,0 @@
-[package]
-name = "gospel-dump"
-version = "0.1.0"
-edition = "2021"
-authors = ["Kyuuhachi <caagr98@gmail.com>"]
-description = "Simple hex dump"
-repository = "https://github.com/Aureole-Suite/Gospel"
-license = "MIT OR Apache-2.0"
-keywords = ["hex", "dump", "hexdump"]

@@ -13,5 +13,4 @@ with labels.
 pub mod read;
 pub mod write;
 
-#[cfg(feature = "dump")]
-pub use gospel_dump as dump;
+pub mod dump;
